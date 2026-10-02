@@ -7,6 +7,12 @@
         app:fragment="com.termux.app.fragments.settings.TermuxPreferencesFragment"/>
 
     <Preference
+        app:key="vpn"
+        app:title="@string/termux_vpn_preferences_title"
+        app:summary="@string/termux_vpn_preferences_summary"
+        app:fragment="com.termux.app.fragments.settings.termux.VpnPreferencesFragment"/>
+
+    <Preference
         app:key="termux_api"
         app:title="@string/termux_api_preferences_title"
         app:summary="@string/termux_api_preferences_summary"

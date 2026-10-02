@@ -8,5 +8,9 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 -dontobfuscate
+
+-keep class com.termux.app.vpn.TermuxTun2socks {
+    native <methods>;
+}
 #-renamesourcefileattribute SourceFile
 #-keepattributes SourceFile,LineNumberTable

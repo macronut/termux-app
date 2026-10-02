@@ -1,0 +1,103 @@
+import groovy.json.JsonSlurper
+import java.nio.channels.FileChannel
+import java.nio.file.StandardOpenOption
+import java.security.MessageDigest
+
+// Keep upstream sources out of src/. Archives survive clean in the Gradle user cache;
+// extracted sources and assets are disposable build outputs.
+def lockFile = rootProject.file('gradle/third-party-dependencies.json')
+def dependencies = new JsonSlurper().parse(lockFile)
+def sourceDirectory = layout.buildDirectory.dir('third-party').get().asFile
+def archiveDirectory = new File(gradle.gradleUserHomeDir, 'caches/termux-third-party')
+ext.hevSourceDirectory = new File(sourceDirectory, 'hev-socks5-tunnel')
+
+def sha256 = { File source ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    source.withInputStream { stream ->
+        byte[] buffer = new byte[65536]
+        int count
+        while ((count = stream.read(buffer)) != -1) digest.update(buffer, 0, count)
+    }
+    digest.digest().encodeHex().toString()
+}
+
+def prepareThirdParty = tasks.register('prepareThirdParty') {
+    group = 'build setup'
+    description = 'Fetch and verify pinned VPN sources and styling assets.'
+    inputs.file(lockFile)
+    inputs.file(rootProject.file('gradle/third-party.gradle'))
+    outputs.dir(sourceDirectory)
+
+    doLast {
+        archiveDirectory.mkdirs()
+        // Separate checkouts can share this cache without racing downloads.
+        FileChannel.open(new File(archiveDirectory, '.lock').toPath(),
+            StandardOpenOption.CREATE, StandardOpenOption.WRITE).withCloseable { channel ->
+            def cacheLock = channel.lock()
+            try {
+                def archives = dependencies.collect { dependency ->
+                    def archive = new File(archiveDirectory, "${dependency.sha256}.tar.gz")
+                    if (!archive.exists() || sha256(archive) != dependency.sha256) {
+                        if (gradle.startParameter.offline) {
+                            throw new GradleException("Missing or invalid cached archive for ${dependency.name}. Run :app:prepareThirdParty once without --offline.")
+                        }
+                        def url = "https://codeload.github.com/${dependency.repository}/tar.gz/${dependency.commit}"
+                        logger.lifecycle("Downloading ${dependency.name} at ${dependency.commit}")
+                        def temporary = new File(archiveDirectory, "${dependency.sha256}.part")
+                        try {
+                            def connection = new URL(url).openConnection()
+                            connection.connectTimeout = 30000
+                            connection.readTimeout = 120000
+                            connection.inputStream.withCloseable { input ->
+                                temporary.withOutputStream { output -> output << input }
+                            }
+                            if (sha256(temporary) != dependency.sha256) {
+                                throw new GradleException("SHA-256 mismatch for ${dependency.name}")
+                            }
+                            java.nio.file.Files.move(temporary.toPath(), archive.toPath(),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                        } finally {
+                            temporary.delete()
+                        }
+                    }
+                    archive
+                }
+
+                delete(sourceDirectory)
+                dependencies.eachWithIndex { dependency, index ->
+                    def destination = new File(sourceDirectory, dependency.directory)
+                    destination.mkdirs()
+                    // tar preserves upstream header/license symlinks (Gradle copy does not).
+                    providers.exec {
+                        commandLine 'tar', '-xzf', archives[index].absolutePath,
+                            '--strip-components=1', '-C', destination.absolutePath
+                    }.result.get().assertNormalExitValue()
+                }
+
+                // Preserve the existing Android integration: build the shared JNI library only.
+                def makefile = new File(hevSourceDirectory, 'Android.mk')
+                def marker = '# Standalone executable build'
+                if (!makefile.text.contains(marker)) {
+                    throw new GradleException('Upstream Android.mk changed; review the shared-library adaptation.')
+                }
+                makefile.text = makefile.text.substring(0, makefile.text.indexOf(marker)).trim() + '\n'
+                def application = new File(hevSourceDirectory, 'Application.mk')
+                application.text = application.text.replace('APP_ABI := armeabi-v7a arm64-v8a x86 x86_64', 'APP_ABI := arm64-v8a')
+                new File(hevSourceDirectory, '.rev-id').text = dependencies[0].commit.take(7) + '\n'
+            } finally {
+                cacheLock.release()
+            }
+        }
+    }
+}
+
+android.sourceSets.main.assets.srcDir(new File(sourceDirectory, 'termux-styling/app/src/main/assets'))
+
+tasks.configureEach { task ->
+    // Native model generation can run independently of preBuild (e.g. Android Studio).
+    if (task.name == 'preBuild' || task.name.startsWith('configureNdkBuild') ||
+        task.name.startsWith('buildNdkBuild') || task.name.startsWith('generateJsonModel') ||
+        (task.name.startsWith('merge') && task.name.endsWith('Assets'))) {
+        task.dependsOn(prepareThirdParty)
+    }
+}

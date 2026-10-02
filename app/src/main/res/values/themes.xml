@@ -46,4 +46,9 @@
         <item name="extraKeysButtonActiveBackgroundColor">@color/grey_500</item>
     </style>
 
+    <!-- Termux:Styling dialog. -->
+    <style name="Theme.TermuxStyleActivity" parent="@android:style/Theme.Material.Light.Dialog.NoActionBar.MinWidth">
+        <item name="android:colorAccent">#212121</item>
+    </style>
+
 </resources>

@@ -1,7 +1,7 @@
 package com.termux.shared.termux.settings.preferences;
 
 /*
- * Version: v0.16.0
+ * Version: v0.17.0
  *
  * Changelog
  *
@@ -69,6 +69,10 @@ package com.termux.shared.termux.settings.preferences;
  * - 0.16.0 (2022-06-11)
  *      - Added following to `TERMUX_APP`:
  *          `KEY_APP_SHELL_NUMBER_SINCE_BOOT` and `KEY_TERMINAL_SESSION_NUMBER_SINCE_BOOT`.
+ *
+ * - 0.17.0 (2026-09-03)
+ *      - Added following to `TERMUX_APP`:
+ *          `KEY_VPN_SOCKS_HOST`, `KEY_VPN_SOCKS_PORT`, `KEY_VPN_DNS_IPV4`, `KEY_VPN_DNS_IPV6`.
  */
 
 import com.termux.shared.shell.command.ExecutionCommand;
@@ -179,6 +183,74 @@ public final class TermuxPreferenceConstants {
          */
         public static final String KEY_CRASH_REPORT_NOTIFICATIONS_ENABLED = "crash_report_notifications_enabled";
         public static final boolean DEFAULT_VALUE_CRASH_REPORT_NOTIFICATIONS_ENABLED = true;
+
+        /**
+         * SOCKS5 proxy host used by the Termux VPN tun2socks path.
+         */
+        public static final String KEY_VPN_SOCKS_HOST = "vpn_socks_host";
+
+        /**
+         * SOCKS5 proxy port used by the Termux VPN tun2socks path. Stored as a string for EditTextPreference.
+         */
+        public static final String KEY_VPN_SOCKS_PORT = "vpn_socks_port";
+
+        /**
+         * Whether application split tunneling is enabled for the Termux VPN tun2socks path.
+         */
+        public static final String KEY_VPN_SPLIT_TUNNELING_ENABLED = "vpn_split_tunneling_enabled";
+
+        /**
+         * Application split tunneling mode used by the Termux VPN tun2socks path.
+         */
+        public static final String KEY_VPN_SPLIT_TUNNELING_MODE = "vpn_split_tunneling_mode";
+
+        /**
+         * Package names excluded from VPN routing when split tunneling uses exclude mode.
+         */
+        public static final String KEY_VPN_EXCLUDED_PACKAGES = "vpn_excluded_packages";
+
+        /**
+         * Package names included in VPN routing when split tunneling uses include mode.
+         */
+        public static final String KEY_VPN_INCLUDED_PACKAGES = "vpn_included_packages";
+
+        /**
+         * Legacy package list shared by both application routing modes.
+         */
+        @Deprecated
+        public static final String KEY_VPN_APP_PACKAGES = "vpn_app_packages";
+
+        /**
+         * Legacy application routing mode key used by an intermediate build.
+         */
+        public static final String KEY_VPN_APP_MODE = "vpn_app_mode";
+
+        /**
+         * Legacy setting for whether the Termux application itself was included in VPN routing.
+         * Kept for migration of preferences created by older builds.
+         */
+        public static final String KEY_VPN_GLOBAL = "vpn_global";
+
+        /**
+         * When true, hev {@code mapdns} Fake-IP is used so SOCKS5 receives domain names (remote DNS).
+         */
+        public static final String KEY_VPN_REMOTE_DNS_ENABLED = "vpn_remote_dns_enabled";
+
+        /**
+         * Legacy preference key for the former configurable Mapped DNS address.
+         */
+        @Deprecated
+        public static final String KEY_VPN_MAPDNS_ADDRESS = "vpn_mapdns_address";
+
+        /**
+         * IPv4 DNS server whose UDP/53 queries are sent through SOCKS5 UDP ASSOCIATE when remote DNS is off.
+         */
+        public static final String KEY_VPN_DNS_IPV4 = "vpn_dns_ipv4";
+
+        /**
+         * IPv6 DNS server whose UDP/53 queries are sent through SOCKS5 UDP ASSOCIATE when remote DNS is off.
+         */
+        public static final String KEY_VPN_DNS_IPV6 = "vpn_dns_ipv6";
 
     }
 

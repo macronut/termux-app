@@ -34,7 +34,9 @@ public class TermuxNotificationUtils {
         int lastNotificationId = preferences.getLastNotificationId();
 
         int nextNotificationId = lastNotificationId + 1;
-        while(nextNotificationId == TermuxConstants.TERMUX_APP_NOTIFICATION_ID || nextNotificationId == TermuxConstants.TERMUX_RUN_COMMAND_NOTIFICATION_ID) {
+        while(nextNotificationId == TermuxConstants.TERMUX_APP_NOTIFICATION_ID
+            || nextNotificationId == TermuxConstants.TERMUX_RUN_COMMAND_NOTIFICATION_ID
+            || nextNotificationId == TermuxConstants.TERMUX_VPN_NOTIFICATION_ID) {
             nextNotificationId++;
         }
 

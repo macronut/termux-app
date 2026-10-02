@@ -2,6 +2,8 @@ plugins {
     id "com.android.application"
 }
 
+apply from: rootProject.file('gradle/third-party.gradle')
+
 ext {
     // The packageVariant defines the bootstrap variant that will be included in the app APK.
     // This must be supported by com.termux.shared.termux.TermuxBootstrap.PackageVariant or app will
@@ -10,6 +12,7 @@ ext {
     // by replacing $PREFIX since app code is dependant on the variant used to build the APK.
     // Currently supported values are: [ "apt-android-7" "apt-android-5" ]
     packageVariant = System.getenv("TERMUX_PACKAGE_VARIANT") ?: "apt-android-7" // Default: "apt-android-7"
+    termuxAbiFilters = (findProperty("termuxAbiFilters") ?: "arm64-v8a").split(",").collect { it.trim() }.findAll { it }
 }
 
 android {
@@ -43,7 +46,7 @@ android {
     defaultConfig {
         minSdkVersion project.properties.minSdkVersion.toInteger()
         targetSdkVersion project.properties.targetSdkVersion.toInteger()
-        versionCode 118
+        versionCode 142
         versionName "0.118.0"
 
         if (appVersionName) versionName = appVersionName
@@ -62,17 +65,27 @@ android {
 
         externalNativeBuild {
             ndkBuild {
-                cFlags "-std=c11", "-Wall", "-Wextra", "-Werror", "-Os", "-fno-stack-protector", "-Wl,--gc-sections"
+                arguments "HEV_SOURCE_DIR=${project.ext.hevSourceDirectory.absolutePath}"
+                // Applies to every module in Android.mk, so only the flags that all of them
+                // tolerate belong here. Per-module flags live in their own Android.mk.
+                // These two bind the hev-socks5-tunnel JNI entry point to TermuxTun2socks.
+                cFlags "-DPKGNAME=com/termux/app/vpn", "-DCLSNAME=TermuxTun2socks"
             }
+        }
+
+        ndk {
+            abiFilters(*project.ext.termuxAbiFilters)
         }
 
         splits {
             abi {
-                enable ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
+                def splitEnabled = project.ext.termuxAbiFilters.size() > 1 &&
+                    ((gradle.startParameter.taskNames.any { it.contains("Debug") } && splitAPKsForDebugBuilds == "1") ||
                     (gradle.startParameter.taskNames.any { it.contains("Release") } && splitAPKsForReleaseBuilds == "1"))
-                reset ()
-                include 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
-                universalApk true
+                enable splitEnabled
+                reset()
+                include(*project.ext.termuxAbiFilters)
+                universalApk false
             }
         }
     }
@@ -130,12 +143,14 @@ android {
 
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
+            def abiLabel = output.getFilter(com.android.build.OutputFile.ABI)
+            if (!abiLabel && project.ext.termuxAbiFilters.size() == 1) {
+                abiLabel = project.ext.termuxAbiFilters[0]
+            }
             if (variant.buildType.name == "debug") {
-                def abi = output.getFilter(com.android.build.OutputFile.ABI)
-                outputFileName = new File("termux-app_" + (apkVersionTag ? apkVersionTag : project.ext.packageVariant + "-" + "debug") + "_" + (abi ? abi : "universal") + ".apk")
+                outputFileName = new File("termux-app_" + (apkVersionTag ? apkVersionTag : project.ext.packageVariant + "-" + "debug") + "_" + (abiLabel ?: "universal") + ".apk")
             } else if (variant.buildType.name == "release") {
-                def abi = output.getFilter(com.android.build.OutputFile.ABI)
-                outputFileName = new File("termux-app_" + (apkVersionTag ? apkVersionTag : project.ext.packageVariant + "-" + "release") + "_" + (abi ? abi : "universal") + ".apk")
+                outputFileName = new File("termux-app_" + (apkVersionTag ? apkVersionTag : project.ext.packageVariant + "-" + "release") + "_" + (abiLabel ?: "universal") + ".apk")
             }
         }
     }
@@ -218,18 +233,37 @@ clean {
 task downloadBootstraps() {
     doLast {
         def packageVariant = project.ext.packageVariant
+        def bootstrapArchs = project.ext.termuxAbiFilters.collect { abi ->
+            switch (abi) {
+                case "arm64-v8a": return "aarch64"
+                case "armeabi-v7a": return "arm"
+                case "x86": return "i686"
+                case "x86_64": return "x86_64"
+                default: throw new GradleException("Unsupported ABI filter \"" + abi + "\"")
+            }
+        }
         if (packageVariant == "apt-android-7") {
             def version = "2026.02.12-r1" + "%2B" + "apt.android-7"
-            downloadBootstrap("aarch64", "ea2aeba8819e517db711f8c32369e89e7c52cee73e07930ff91185e1ab93f4f3", version)
-            downloadBootstrap("arm", "a38f4d3b2f735f83be2bf54eff463e86dc32a3e2f9f861c1557c4378d249c018", version)
-            downloadBootstrap("i686", "f5bc0b025b9f3b420b5fcaeefc064f888f5f22a0d6fd7090f4aac0c33eb3555b", version)
-            downloadBootstrap("x86_64", "b7fd0f2e3a4de534be3144f9f91acc768630fc463eaf134ab2e64c545e834f7a", version)
+            def checksums = [
+                "aarch64": "ea2aeba8819e517db711f8c32369e89e7c52cee73e07930ff91185e1ab93f4f3",
+                "arm": "a38f4d3b2f735f83be2bf54eff463e86dc32a3e2f9f861c1557c4378d249c018",
+                "i686": "f5bc0b025b9f3b420b5fcaeefc064f888f5f22a0d6fd7090f4aac0c33eb3555b",
+                "x86_64": "b7fd0f2e3a4de534be3144f9f91acc768630fc463eaf134ab2e64c545e834f7a",
+            ]
+            bootstrapArchs.each { arch ->
+                downloadBootstrap(arch, checksums[arch], version)
+            }
         } else if (packageVariant == "apt-android-5") {
             def version = "2022.04.28-r6" + "+" + packageVariant
-            downloadBootstrap("aarch64", "913609d439415c828c5640be1b0561467e539cb1c7080662decaaca2fb4820e7", version)
-            downloadBootstrap("arm", "26bfb45304c946170db69108e5eb6e3641aad751406ce106c80df80cad2eccf8", version)
-            downloadBootstrap("i686", "46dcfeb5eef67ba765498db9fe4c50dc4690805139aa0dd141a9d8ee0693cd27", version)
-            downloadBootstrap("x86_64", "615b590679ee6cd885b7fd2ff9473c845e920f9b422f790bb158c63fe42b8481", version)
+            def checksums = [
+                "aarch64": "913609d439415c828c5640be1b0561467e539cb1c7080662decaaca2fb4820e7",
+                "arm": "26bfb45304c946170db69108e5eb6e3641aad751406ce106c80df80cad2eccf8",
+                "i686": "46dcfeb5eef67ba765498db9fe4c50dc4690805139aa0dd141a9d8ee0693cd27",
+                "x86_64": "615b590679ee6cd885b7fd2ff9473c845e920f9b422f790bb158c63fe42b8481",
+            ]
+            bootstrapArchs.each { arch ->
+                downloadBootstrap(arch, checksums[arch], version)
+            }
         } else {
             throw new GradleException("Unsupported TERMUX_PACKAGE_VARIANT \"" + packageVariant + "\"")
         }

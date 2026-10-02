@@ -12,7 +12,7 @@ import java.util.Formatter;
 import java.util.List;
 
 /*
- * Version: v0.53.0
+ * Version: v0.54.0
  * SPDX-License-Identifier: MIT
  *
  * Changelog
@@ -282,6 +282,9 @@ import java.util.List;
  * - 0.53.0 (2025-01-12)
  *      - Renamed `TERMUX_API`, `TERMUX_STYLING`, `TERMUX_TASKER`, `TERMUX_WIDGET` classes with `_APP` suffix added.
  *      - Added `TERMUX_*_MAIN_ACTIVITY_NAME` and `TERMUX_*_LAUNCHER_ACTIVITY_NAME` constants to each app class.
+ *
+ * - 0.54.0 (2026-09-03)
+ *      - Added `TERMUX_VPN_*` notification constants and `TERMUX_APP.TERMUX_VPN_SERVICE`.
  */
 
 /**
@@ -873,6 +876,13 @@ public final class TermuxConstants {
     /** Termux app unique notification id used by {@link TERMUX_APP.TERMUX_SERVICE} */
     public static final int TERMUX_FLOAT_APP_NOTIFICATION_ID = 1339;
 
+    /** Termux app notification channel id used by {@link TERMUX_APP.TERMUX_VPN_SERVICE} */
+    public static final String TERMUX_VPN_NOTIFICATION_CHANNEL_ID = "termux_vpn_notification_channel";
+    /** Termux app notification channel name used by {@link TERMUX_APP.TERMUX_VPN_SERVICE} */
+    public static final String TERMUX_VPN_NOTIFICATION_CHANNEL_NAME = TermuxConstants.TERMUX_APP_NAME + " VPN";
+    /** Termux app unique notification id used by {@link TERMUX_APP.TERMUX_VPN_SERVICE} */
+    public static final int TERMUX_VPN_NOTIFICATION_ID = 1340;
+
 
 
 
@@ -1116,6 +1126,116 @@ public final class TermuxConstants {
         }
 
 
+
+        /** Termux app VPN service name. */
+        public static final String TERMUX_VPN_SERVICE_NAME = TERMUX_PACKAGE_NAME + ".app.vpn.TermuxVpnService"; // Default: "com.termux.app.vpn.TermuxVpnService"
+
+        /** Termux app VPN consent activity name. */
+        public static final String TERMUX_VPN_PREPARE_ACTIVITY_NAME = TERMUX_PACKAGE_NAME + ".app.vpn.TermuxVpnPrepareActivity"; // Default: "com.termux.app.vpn.TermuxVpnPrepareActivity"
+
+        /**
+         * Termux app VPN service that captures device traffic and forwards it to a SOCKS5
+         * proxy running inside the Termux Linux environment.
+         */
+        public static final class TERMUX_VPN_SERVICE {
+
+            /** Intent action to start the VPN tunnel. */
+            public static final String ACTION_START = TERMUX_PACKAGE_NAME + ".vpn.START"; // Default: "com.termux.vpn.START"
+
+            /** Intent action to stop the VPN tunnel. */
+            public static final String ACTION_STOP = TERMUX_PACKAGE_NAME + ".vpn.STOP"; // Default: "com.termux.vpn.STOP"
+
+            /** Intent {@code String} extra for SOCKS5 proxy host. */
+            public static final String EXTRA_SOCKS_HOST = TERMUX_PACKAGE_NAME + ".vpn.SOCKS_HOST"; // Default: "com.termux.vpn.SOCKS_HOST"
+
+            /** Intent {@code int} extra for SOCKS5 proxy port. */
+            public static final String EXTRA_SOCKS_PORT = TERMUX_PACKAGE_NAME + ".vpn.SOCKS_PORT"; // Default: "com.termux.vpn.SOCKS_PORT"
+
+            /**
+             * Legacy intent {@code boolean} extra for application routing. {@code true} maps to
+             * disabled split tunneling and {@code false} maps to split tunneling in exclude mode
+             * with Termux excluded.
+             */
+            @Deprecated
+            public static final String EXTRA_GLOBAL = TERMUX_PACKAGE_NAME + ".vpn.GLOBAL"; // Default: "com.termux.vpn.GLOBAL"
+
+            /** Intent {@code boolean} extra for enabling application split tunneling. */
+            public static final String EXTRA_SPLIT_TUNNELING = TERMUX_PACKAGE_NAME + ".vpn.SPLIT_TUNNELING"; // Default: "com.termux.vpn.SPLIT_TUNNELING"
+
+            /** Intent {@code String} extra for the include/exclude application mode. */
+            public static final String EXTRA_APP_MODE = TERMUX_PACKAGE_NAME + ".vpn.APP_MODE"; // Default: "com.termux.vpn.APP_MODE"
+
+            /** Intent {@code ArrayList<String>} extra for selected application package names. */
+            public static final String EXTRA_APP_PACKAGES = TERMUX_PACKAGE_NAME + ".vpn.APP_PACKAGES"; // Default: "com.termux.vpn.APP_PACKAGES"
+
+            /**
+             * Legacy intent extra for the former configurable mapped DNS address. The value is
+             * ignored; the VPN always uses {@link #DEFAULT_MAPDNS_ADDRESS}.
+             */
+            @Deprecated
+            public static final String EXTRA_MAPDNS_ADDRESS = TERMUX_PACKAGE_NAME + ".vpn.MAPDNS_ADDRESS"; // Default: "com.termux.vpn.MAPDNS_ADDRESS"
+
+            /** Intent {@code boolean} extra for Fake-IP remote DNS ({@code mapdns}). */
+            public static final String EXTRA_REMOTE_DNS_ENABLED = TERMUX_PACKAGE_NAME + ".vpn.REMOTE_DNS_ENABLED"; // Default: "com.termux.vpn.REMOTE_DNS_ENABLED"
+
+            /** Intent {@code String} extra for IPv4 DNS when remote DNS is disabled (SOCKS UDP). */
+            public static final String EXTRA_DNS_IPV4 = TERMUX_PACKAGE_NAME + ".vpn.DNS_IPV4"; // Default: "com.termux.vpn.DNS_IPV4"
+
+            /** Intent {@code String} extra for IPv6 DNS when remote DNS is disabled (SOCKS UDP). */
+            public static final String EXTRA_DNS_IPV6 = TERMUX_PACKAGE_NAME + ".vpn.DNS_IPV6"; // Default: "com.termux.vpn.DNS_IPV6"
+
+            /** Route only selected applications through the VPN. */
+            public static final String APP_MODE_INCLUDE = "include";
+            /** Route every application through the VPN except selected applications. */
+            public static final String APP_MODE_EXCLUDE = "exclude";
+
+            /** @deprecated Use {@link #APP_MODE_INCLUDE}. */
+            @Deprecated
+            public static final String APP_MODE_INCLUDE_SELECTED = "include_selected";
+            /** @deprecated Use {@link #APP_MODE_EXCLUDE}. */
+            @Deprecated
+            public static final String APP_MODE_EXCLUDE_SELECTED = "exclude_selected";
+            /** @deprecated Global mode is now represented by disabled split tunneling. */
+            @Deprecated
+            public static final String APP_MODE_GLOBAL = "global";
+            /** @deprecated Termux exclusion is now represented by the default app list. */
+            @Deprecated
+            public static final String APP_MODE_EXCLUDE_TERMUX = "exclude_termux";
+
+            /** Split tunneling is disabled by default; the service still excludes Termux. */
+            public static final boolean DEFAULT_SPLIT_TUNNELING_ENABLED = false;
+            /** Default mode used when split tunneling is enabled. */
+            public static final String DEFAULT_APP_MODE = APP_MODE_EXCLUDE;
+
+            public static final String DEFAULT_SOCKS_HOST = "127.0.0.1";
+            public static final int DEFAULT_SOCKS_PORT = 1080;
+            /** @deprecated Use {@link #DEFAULT_APP_MODE}. */
+            @Deprecated
+            public static final boolean DEFAULT_GLOBAL = false;
+
+            /** Default on: SOCKS5 receives domain names via Fake-IP instead of raw DNS packets. */
+            public static final boolean DEFAULT_REMOTE_DNS_ENABLED = true;
+
+            /** Upstream DNS servers used when {@link #DEFAULT_REMOTE_DNS_ENABLED} is off. */
+            public static final String DEFAULT_DNS_IPV4 = "1.1.1.1";
+            public static final String DEFAULT_DNS_IPV6 = "2606:4700:4700::1111";
+
+            /** Mapped DNS listener on the TUN interface; must match hev {@code mapdns.address}. */
+            public static final String DEFAULT_MAPDNS_ADDRESS = "172.19.0.2";
+            public static final int DEFAULT_MAPDNS_PORT = 53;
+            /** Fake-IP pool for domain→IP mapping (remote DNS via SOCKS5 domain relay). */
+            public static final String DEFAULT_MAPDNS_NETWORK = "240.0.0.0";
+            public static final String DEFAULT_MAPDNS_NETMASK = "240.0.0.0";
+            public static final int DEFAULT_MAPDNS_PREFIX_LENGTH = 4;
+            public static final int DEFAULT_MAPDNS_CACHE_SIZE = 10000;
+
+            public static final String TUN_IPV4_ADDRESS = "172.19.0.1";
+            public static final String TUN_IPV4_ROUTE = "172.19.0.0";
+            public static final int TUN_IPV4_PREFIX_LENGTH = 30;
+            public static final String TUN_IPV6_ADDRESS = "fdfe:dcba:9876::1";
+            public static final int TUN_IPV6_PREFIX_LENGTH = 126;
+            public static final int TUN_MTU = 1500;
+        }
 
 
 

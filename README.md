@@ -227,6 +227,39 @@ Users must post complete report (optionally without sensitive info) when reporti
 
 ## For Maintainers and Contributors
 
+### External native code and styling assets
+
+The VPN engine (`hev-socks5-tunnel`, including its four source dependencies) and
+Termux:Styling fonts and color schemes are fetched during the build instead of
+being stored under `app/src/main`. Exact upstream commits and archive SHA-256
+checksums are recorded in [`gradle/third-party-dependencies.json`](gradle/third-party-dependencies.json).
+The build keeps the existing JNI bindings and shared-library build adjustments.
+
+Use JDK 17 or newer, the Android SDK/NDK versions in `gradle.properties`, and `tar`
+on PATH (available on macOS, Linux, and current Windows). Configure the SDK path
+in `local.properties`, then build normally:
+
+```sh
+./gradlew :app:assembleDebug :app:assembleRelease
+```
+
+The first build needs access to `codeload.github.com`. Verified archives are cached
+under `$GRADLE_USER_HOME/caches/termux-third-party` (`~/.gradle` by default), while
+extracted sources and assets go under `app/build/third-party`. To fetch these
+dependencies separately, run `./gradlew :app:prepareThirdParty`. Once all Gradle,
+Android, bootstrap, and third-party dependencies are cached, builds support
+`--offline`. Cleaning `app/build` does not remove the third-party archive cache.
+Missing or corrupt archives fail explicitly in offline mode.
+The existing `app:clean` task also deletes `app/src/main/cpp/bootstrap-*.zip`;
+restore those verified bootstrap archives before an offline build after `clean`.
+
+When updating a dependency, review the upstream changes, update its commit and
+checksum together, and check any submodule commits and Android build adjustments.
+Upstream licenses remain in the extracted dependency trees; font and color license
+files are packaged with the assets as before.
+
+### Shared libraries
+
 The [termux-shared](termux-shared) library was added in [`v0.109`](https://github.com/termux/termux-app/releases/tag/v0.109). It defines shared constants and utils of the Termux app and its plugins. It was created to allow for the removal of all hardcoded paths in the Termux app. Some of the termux plugins are using this as well and rest will in future. If you are contributing code that is using a constant or a util that may be shared, then define it in `termux-shared` library if it currently doesn't exist and reference it from there. Update the relevant changelogs as well. Pull requests using hardcoded values **will/should not** be accepted. Termux app and plugin specific classes must be added under `com.termux.shared.termux` package and general classes outside it. The [`termux-shared` `LICENSE`](termux-shared/LICENSE.md) must also be checked and updated if necessary when contributing code. The licenses of any external library or code must be honoured.
 
 The main Termux constants are defined by [`TermuxConstants`](https://github.com/termux/termux-app/blob/master/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java) class. It also contains information on how to fork Termux or build it with your own package name. Changing the package name will require building the bootstrap zip packages and other packages with the new `$PREFIX`, check [Building Packages](https://github.com/termux/termux-packages/wiki/Building-packages) for more info.

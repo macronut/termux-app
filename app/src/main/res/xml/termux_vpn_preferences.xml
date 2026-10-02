@@ -1,0 +1,61 @@
+<PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        app:key="vpn"
+        app:title="@string/termux_vpn_header">
+
+        <SwitchPreferenceCompat
+            app:key="vpn_enabled"
+            app:persistent="false"
+            app:title="@string/termux_vpn_use_proxy" />
+
+        <EditTextPreference
+            app:key="vpn_socks_host"
+            app:title="@string/termux_vpn_socks_host_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="vpn_socks_port"
+            app:title="@string/termux_vpn_socks_port_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:key="vpn_remote_dns_enabled"
+            app:title="@string/termux_vpn_remote_dns_title" />
+
+        <EditTextPreference
+            app:key="vpn_dns_ipv4"
+            app:title="@string/termux_vpn_dns_ipv4_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            app:key="vpn_dns_ipv6"
+            app:title="@string/termux_vpn_dns_ipv6_title"
+            app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="vpn_split_tunneling_enabled"
+            app:title="@string/termux_vpn_split_tunneling_title" />
+
+        <com.termux.app.fragments.settings.termux.RadioButtonPreference
+            app:key="vpn_split_tunneling_exclude"
+            app:persistent="false"
+            app:title="@string/termux_vpn_split_tunneling_mode_exclude" />
+
+        <com.termux.app.fragments.settings.termux.RadioButtonPreference
+            app:key="vpn_split_tunneling_include"
+            app:persistent="false"
+            app:title="@string/termux_vpn_split_tunneling_mode_include" />
+
+        <MultiSelectListPreference
+            app:key="vpn_excluded_packages"
+            app:title="@string/termux_vpn_app_packages_title" />
+
+        <MultiSelectListPreference
+            app:key="vpn_included_packages"
+            app:title="@string/termux_vpn_app_packages_included_title" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

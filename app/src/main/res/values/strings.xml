@@ -83,6 +83,9 @@
     <string name="title_confirm_kill_process">Really kill this session?</string>
 
     <string name="action_style_terminal">Style</string>
+    <string name="color_prompt">Choose color</string>
+    <string name="font_prompt">Choose font</string>
+    <string name="writing_failed">Failed to install file:\n\n</string>
     <string name="action_toggle_keep_screen_on">Keep screen on</string>
     <string name="action_open_help">Help</string>
     <string name="action_open_settings">Settings</string>
@@ -91,15 +94,16 @@
     <string name="msg_generating_report">Generating Report</string>
     <string name="msg_add_termux_debug_info">Add termux debug info to report?</string>
 
-    <string name="error_styling_not_installed">The &TERMUX_STYLING_APP_NAME; Plugin App is not installed.</string>
-    <string name="action_styling_install">Install</string>
-
 
 
     <!-- Termux Notifications -->
     <string name="notification_action_exit">Exit</string>
     <string name="notification_action_wake_lock">Acquire wakelock</string>
     <string name="notification_action_wake_unlock">Release wakelock</string>
+    <string name="notification_vpn_title">&TERMUX_APP_NAME; VPN</string>
+    <string name="notification_vpn_starting">Starting tunnel…</string>
+    <string name="notification_vpn_running">SOCKS5 %1$s</string>
+    <string name="notification_action_vpn_stop">Stop VPN</string>
 
 
 
@@ -202,6 +206,27 @@
                 <string name="termux_terminal_view_terminal_margin_adjustment_on">Terminal margin adjustment will be enabled.
                     It should be enabled to try to fix the issue where soft keyboard covers part of extra keys/terminal view.
                     If it causes screen flickering on your devices, then disable it. (Default)</string>
+
+
+        <!-- VPN Preferences -->
+        <string name="termux_vpn_preferences_title">Proxy</string>
+        <string name="termux_vpn_preferences_summary">Forward device traffic to a SOCKS5 proxy in Termux</string>
+        <string name="termux_vpn_header">Tunnel</string>
+        <string name="termux_vpn_use_proxy">Use Proxy</string>
+        <string name="termux_vpn_split_tunneling_title">Split tunneling</string>
+        <string name="termux_vpn_split_tunneling_mode_include">Include mode</string>
+        <string name="termux_vpn_split_tunneling_mode_exclude">Exclude mode</string>
+        <string name="termux_vpn_app_packages_title">Excluded apps</string>
+        <string name="termux_vpn_app_packages_included_title">Included apps</string>
+        <string name="termux_vpn_app_packages_none">No apps selected.</string>
+        <string name="termux_vpn_app_packages_summary">%1$d apps selected.</string>
+        <string name="termux_vpn_app_termux_warning">Termux is not excluded. A local SOCKS5 proxy may loop through its own VPN.</string>
+        <string name="termux_vpn_app_include_empty">Select at least one app before enabling this mode.</string>
+        <string name="termux_vpn_socks_host_title">SOCKS5 Host</string>
+        <string name="termux_vpn_socks_port_title">SOCKS5 Port</string>
+        <string name="termux_vpn_remote_dns_title">Remote DNS</string>
+        <string name="termux_vpn_dns_ipv4_title">DNS IPv4</string>
+        <string name="termux_vpn_dns_ipv6_title">DNS IPv6</string>
 
 
 

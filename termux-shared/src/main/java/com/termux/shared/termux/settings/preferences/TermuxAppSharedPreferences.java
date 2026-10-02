@@ -15,6 +15,10 @@ import com.termux.shared.data.DataUtils;
 import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.termux.settings.preferences.TermuxPreferenceConstants.TERMUX_APP;
 
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
 public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     private int MIN_FONTSIZE;
@@ -256,6 +260,226 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
 
     public void setCrashReportNotificationsEnabled(boolean value) {
         SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_CRASH_REPORT_NOTIFICATIONS_ENABLED, value, false);
+    }
+
+
+
+    public String getVpnSocksHost() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_VPN_SOCKS_HOST,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_SOCKS_HOST, true);
+    }
+
+    public void setVpnSocksHost(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_VPN_SOCKS_HOST, value, false);
+    }
+
+    public int getVpnSocksPort() {
+        String stored = SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_VPN_SOCKS_PORT,
+            String.valueOf(TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_SOCKS_PORT), true);
+        try {
+            int port = Integer.parseInt(stored);
+            if (port > 0 && port <= 65535) return port;
+        } catch (NumberFormatException ignored) {}
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_SOCKS_PORT;
+    }
+
+    public void setVpnSocksPort(int value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_VPN_SOCKS_PORT, String.valueOf(value), false);
+    }
+
+    public boolean getVpnSplitTunnelingEnabled() {
+        if (mSharedPreferences.contains(TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_ENABLED)) {
+            return SharedPreferenceUtils.getBoolean(mSharedPreferences,
+                TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_ENABLED,
+                TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_SPLIT_TUNNELING_ENABLED);
+        }
+
+        String legacyMode = getLegacyVpnAppMode();
+        if (legacyMode == null) {
+            return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_SPLIT_TUNNELING_ENABLED;
+        }
+        return !TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_GLOBAL.equals(legacyMode);
+    }
+
+    public void setVpnSplitTunnelingEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences,
+            TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_ENABLED, value, false);
+    }
+
+    public boolean isVpnSplitTunnelingInitialized() {
+        return mSharedPreferences.contains(TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_ENABLED);
+    }
+
+    public String getVpnAppMode() {
+        String mode = SharedPreferenceUtils.getString(mSharedPreferences,
+            TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_MODE, null, true);
+        if (isCurrentVpnAppMode(mode)) return mode;
+
+        String legacyMode = getLegacyVpnAppMode();
+        if (TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE_SELECTED.equals(legacyMode)) {
+            return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE;
+        }
+        if (TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_SELECTED.equals(legacyMode)
+            || TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_TERMUX.equals(legacyMode)) {
+            return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE;
+        }
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_APP_MODE;
+    }
+
+    public void setVpnAppMode(String value) {
+        if (!isCurrentVpnAppMode(value)) {
+            value = TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_APP_MODE;
+        }
+        SharedPreferenceUtils.setString(mSharedPreferences,
+            TERMUX_APP.KEY_VPN_SPLIT_TUNNELING_MODE, value, false);
+    }
+
+    public Set<String> getVpnExcludedPackages() {
+        return getVpnPackages(TERMUX_APP.KEY_VPN_EXCLUDED_PACKAGES,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE);
+    }
+
+    public void setVpnExcludedPackages(Set<String> packages) {
+        setVpnPackages(TERMUX_APP.KEY_VPN_EXCLUDED_PACKAGES, packages);
+    }
+
+    public Set<String> getVpnIncludedPackages() {
+        return getVpnPackages(TERMUX_APP.KEY_VPN_INCLUDED_PACKAGES,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE);
+    }
+
+    public void setVpnIncludedPackages(Set<String> packages) {
+        setVpnPackages(TERMUX_APP.KEY_VPN_INCLUDED_PACKAGES, packages);
+    }
+
+    /**
+     * Returns the package list for the currently selected routing mode.
+     */
+    public Set<String> getVpnAppPackages() {
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE.equals(getVpnAppMode())
+            ? getVpnIncludedPackages() : getVpnExcludedPackages();
+    }
+
+    /**
+     * Stores the package list for the currently selected routing mode.
+     */
+    public void setVpnAppPackages(Set<String> packages) {
+        if (TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE.equals(getVpnAppMode())) {
+            setVpnIncludedPackages(packages);
+        } else {
+            setVpnExcludedPackages(packages);
+        }
+    }
+
+    private void setVpnPackages(String key, Set<String> packages) {
+        Set<String> values = packages == null ? Collections.emptySet() : new HashSet<>(packages);
+        SharedPreferenceUtils.setStringSet(mSharedPreferences, key, values, false);
+    }
+
+    private Set<String> getVpnPackages(String key, String mode) {
+        if (mSharedPreferences.contains(key)) {
+            Set<String> packages = SharedPreferenceUtils.getStringSet(mSharedPreferences, key,
+                Collections.emptySet());
+            return packages == null ? new HashSet<>() : new HashSet<>(packages);
+        }
+
+        // Migrate the old single list into the mode it represented. Keep the old key untouched
+        // until the new list is written, so reads remain backward-compatible.
+        boolean hasNewPackageLists = mSharedPreferences.contains(TERMUX_APP.KEY_VPN_EXCLUDED_PACKAGES)
+            || mSharedPreferences.contains(TERMUX_APP.KEY_VPN_INCLUDED_PACKAGES);
+        if (hasNewPackageLists || !mode.equals(getVpnAppMode())) {
+            return new HashSet<>();
+        }
+
+        Set<String> packages = SharedPreferenceUtils.getStringSet(mSharedPreferences,
+            TERMUX_APP.KEY_VPN_APP_PACKAGES, Collections.emptySet());
+        Set<String> values = packages == null ? new HashSet<>() : new HashSet<>(packages);
+        if (values.isEmpty()
+            && TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_TERMUX.equals(
+                getLegacyVpnAppMode())
+            && TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE.equals(mode)) {
+            values.add(TermuxConstants.TERMUX_PACKAGE_NAME);
+        }
+        return values;
+    }
+
+    @Deprecated
+    public boolean getVpnGlobal() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_VPN_GLOBAL,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_GLOBAL);
+    }
+
+    @Deprecated
+    public void setVpnGlobal(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_VPN_GLOBAL, value, false);
+    }
+
+    public boolean getVpnRemoteDnsEnabled() {
+        return SharedPreferenceUtils.getBoolean(mSharedPreferences, TERMUX_APP.KEY_VPN_REMOTE_DNS_ENABLED,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_REMOTE_DNS_ENABLED);
+    }
+
+    public void setVpnRemoteDnsEnabled(boolean value) {
+        SharedPreferenceUtils.setBoolean(mSharedPreferences, TERMUX_APP.KEY_VPN_REMOTE_DNS_ENABLED, value, false);
+    }
+
+    /**
+     * @deprecated Mapped DNS is fixed to the VPN's internal address.
+     */
+    @Deprecated
+    public String getVpnMapdnsAddress() {
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_MAPDNS_ADDRESS;
+    }
+
+    /**
+     * @deprecated Mapped DNS is fixed to the VPN's internal address.
+     */
+    @Deprecated
+    public void setVpnMapdnsAddress(String value) {
+        // Kept as a no-op for callers compiled against the old configurable setting.
+    }
+
+    public String getVpnDnsIpv4() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_VPN_DNS_IPV4,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_DNS_IPV4, true);
+    }
+
+    public void setVpnDnsIpv4(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_VPN_DNS_IPV4, value, false);
+    }
+
+    public String getVpnDnsIpv6() {
+        return SharedPreferenceUtils.getString(mSharedPreferences, TERMUX_APP.KEY_VPN_DNS_IPV6,
+            TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.DEFAULT_DNS_IPV6, true);
+    }
+
+    public void setVpnDnsIpv6(String value) {
+        SharedPreferenceUtils.setString(mSharedPreferences, TERMUX_APP.KEY_VPN_DNS_IPV6, value, false);
+    }
+
+    private String getLegacyVpnAppMode() {
+        String mode = SharedPreferenceUtils.getString(mSharedPreferences,
+            TERMUX_APP.KEY_VPN_APP_MODE, null, true);
+        if (isLegacyVpnAppMode(mode)) return mode;
+
+        if (mSharedPreferences.contains(TERMUX_APP.KEY_VPN_GLOBAL)) {
+            return getVpnGlobal()
+                ? TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_GLOBAL
+                : TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_TERMUX;
+        }
+        return null;
+    }
+
+    private static boolean isCurrentVpnAppMode(String mode) {
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE.equals(mode)
+            || TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE.equals(mode);
+    }
+
+    private static boolean isLegacyVpnAppMode(String mode) {
+        return TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_GLOBAL.equals(mode)
+            || TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_TERMUX.equals(mode)
+            || TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_INCLUDE_SELECTED.equals(mode)
+            || TermuxConstants.TERMUX_APP.TERMUX_VPN_SERVICE.APP_MODE_EXCLUDE_SELECTED.equals(mode);
     }
 
 }
