@@ -1,84 +1,62 @@
-name: Attach Debug APKs To Release
+name: Attach Android 7+ arm64 Debug APK To Release
 
 on:
   release:
     types:
       - published
 
+permissions:
+  contents: write
+
 jobs:
   attach-apks:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        package_variant: [ apt-android-7, apt-android-5 ]
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TERMUX_PACKAGE_VARIANT: apt-android-7
 
     steps:
-      - name: Clone repository
+      - name: Clone release tag
         uses: actions/checkout@v6
         with:
-          ref: ${{ env.GITHUB_REF }}
+          ref: ${{ github.ref }}
 
-      - name: Build and attach APKs to release
-        shell: bash {0}
-        env:
-          PACKAGE_VARIANT: ${{ matrix.package_variant }}
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK and NDK
         run: |
-          exit_on_error() {
-              echo "$1"
-              echo "Deleting '$RELEASE_VERSION_NAME' release and '$GITHUB_REF' tag"
-              hub release delete "$RELEASE_VERSION_NAME"
-              git push --delete origin "$GITHUB_REF"
-              exit 1
-          }
+          compile_sdk=$(sed -n 's/^compileSdkVersion=//p' gradle.properties)
+          ndk_version=$(sed -n 's/^ndkVersion=//p' gradle.properties)
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-$compile_sdk" "ndk;$ndk_version"
 
-          echo "Setting vars"
-          RELEASE_VERSION_NAME="${GITHUB_REF/refs\/tags\//}"
-          if ! printf "%s" "${RELEASE_VERSION_NAME/v/}" | grep -qP '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'; then
-           exit_on_error "The versionName '${RELEASE_VERSION_NAME/v/}' is not a valid version as per semantic version '2.0.0' spec in the format 'major.minor.patch(-prerelease)(+buildmetadata)'. https://semver.org/spec/v2.0.0.html."
-          fi
+      - name: Set release version
+        shell: bash
+        run: |
+          # Keep upstream's semantic-version requirement for manually published tags.
+          printf '%s' "${GITHUB_REF_NAME#v}" | grep -qP '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$'
+          echo "TERMUX_APK_VERSION_TAG=${GITHUB_REF_NAME}+apt-android-7-github-debug" >> "$GITHUB_ENV"
 
-          APK_DIR_PATH="./app/build/outputs/apk/debug"
-          APK_VERSION_TAG="$RELEASE_VERSION_NAME+${{ env.PACKAGE_VARIANT }}-github-debug"
-          APK_BASENAME_PREFIX="termux-app_$APK_VERSION_TAG"
+      - name: Build arm64 APK
+        run: ./gradlew :app:assembleDebug -PtermuxAbiFilters=arm64-v8a
 
-          echo "Building APKs for 'APK_VERSION_TAG' release"
-          export TERMUX_APK_VERSION_TAG="$APK_VERSION_TAG" # Used by app/build.gradle
-          export TERMUX_PACKAGE_VARIANT="${{ env.PACKAGE_VARIANT }}" # Used by app/build.gradle
-          if ! ./gradlew assembleDebug; then
-            exit_on_error "Build failed for '$APK_VERSION_TAG' release."
-          fi
+      - name: Verify APK and generate checksum
+        working-directory: app/build/outputs/apk/debug
+        run: |
+          apk="termux-app_${TERMUX_APK_VERSION_TAG}_arm64-v8a.apk"
+          test -s "$apk"
+          sha256sum "$apk" > "termux-app_${TERMUX_APK_VERSION_TAG}_sha256sums"
 
-          echo "Validating APKs"
-          for abi in universal arm64-v8a armeabi-v7a x86_64 x86; do
-            if ! test -f "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_$abi.apk"; then
-              files_found="$(ls "$APK_DIR_PATH")"
-              exit_on_error "Failed to find built APK at '$APK_DIR_PATH/${APK_BASENAME_PREFIX}_$abi.apk'. Files found: "$'\n'"$files_found"
-            fi
-          done
-
-          echo "Generating sha25sums file"
-          if ! (cd "$APK_DIR_PATH"; sha256sum \
-            "${APK_BASENAME_PREFIX}_universal.apk" \
-            "${APK_BASENAME_PREFIX}_arm64-v8a.apk" \
-            "${APK_BASENAME_PREFIX}_armeabi-v7a.apk" \
-            "${APK_BASENAME_PREFIX}_x86_64.apk" \
-            "${APK_BASENAME_PREFIX}_x86.apk" \
-            > "${APK_BASENAME_PREFIX}_sha256sums"); then
-            exit_on_error "Generate sha25sums failed for '$APK_VERSION_TAG' release."
-          fi
-
-          echo "Attaching APKs to github release"
-          if ! hub release edit \
-          -m "" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_universal.apk" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_arm64-v8a.apk" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_armeabi-v7a.apk" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_x86_64.apk" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_x86.apk" \
-          -a "$APK_DIR_PATH/${APK_BASENAME_PREFIX}_sha256sums" \
-          "$RELEASE_VERSION_NAME"; then
-            exit_on_error "Attach APKs to release failed for '$APK_VERSION_TAG' release."
-          fi
+      - name: Upload APK and checksum to release
+        working-directory: app/build/outputs/apk/debug
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            "termux-app_${TERMUX_APK_VERSION_TAG}_arm64-v8a.apk" \
+            "termux-app_${TERMUX_APK_VERSION_TAG}_sha256sums" \
+            --clobber
